@@ -13,12 +13,17 @@ import software.amazon.awscdk.services.codepipeline.Artifact;
 import software.amazon.awscdk.services.codepipeline.Pipeline;
 import software.amazon.awscdk.services.codepipeline.PipelineProps;
 import software.amazon.awscdk.services.codepipeline.StageOptions;
+import software.amazon.awscdk.services.codepipeline.actions.CloudFormationCreateReplaceChangeSetAction;
+import software.amazon.awscdk.services.codepipeline.actions.CloudFormationCreateReplaceChangeSetActionProps;
+import software.amazon.awscdk.services.codepipeline.actions.CloudFormationExecuteChangeSetAction;
+import software.amazon.awscdk.services.codepipeline.actions.CloudFormationExecuteChangeSetActionProps;
 import software.amazon.awscdk.services.codepipeline.actions.CodeBuildAction;
 import software.amazon.awscdk.services.codepipeline.actions.CodeBuildActionProps;
 import software.amazon.awscdk.services.codepipeline.actions.CodeCommitSourceAction;
 import software.amazon.awscdk.services.codepipeline.actions.CodeCommitSourceActionProps;
 import software.amazon.awscdk.services.s3.Bucket;
 
+import java.util.Arrays;
 import java.util.Collections;
 
 import static software.amazon.awscdk.services.codebuild.LinuxBuildImage.AMAZON_LINUX_2;
@@ -71,6 +76,27 @@ public class PipelineStack extends Stack {
         pipeline.addStage(StageOptions.builder()
                 .stageName("Build")
                 .actions(Collections.singletonList(buildAction))
+                .build());
+
+        CloudFormationCreateReplaceChangeSetAction createChangeSet = new CloudFormationCreateReplaceChangeSetAction(CloudFormationCreateReplaceChangeSetActionProps.builder()
+                .actionName("CreateChangeSet")
+                .templatePath(buildOutput.atPath("packaged.yaml"))
+                .stackName("sam-app")
+                .adminPermissions(true)
+                .changeSetName("sam-app-dev-changeset")
+                .runOrder(1)
+                .build());
+
+        CloudFormationExecuteChangeSetAction executeChangeSet = new CloudFormationExecuteChangeSetAction(CloudFormationExecuteChangeSetActionProps.builder()
+                .actionName("Deploy")
+                .stackName("sam-app")
+                .changeSetName("sam-app-dev-changeset")
+                .runOrder(2)
+                .build());
+
+        pipeline.addStage(StageOptions.builder()
+                .stageName("Dev")
+                .actions(Arrays.asList(createChangeSet, executeChangeSet))
                 .build());
 
     }
